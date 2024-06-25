@@ -1,4 +1,4 @@
-# Microsoft CAPI utilities
+# Microsoft CAPI utilities for Windows and Wine
 
 ## Pre-requisites
 
