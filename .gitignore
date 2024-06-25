@@ -1,0 +1,8 @@
+.gdb_history
+*.exe
+*.dll
+*.dll.so
+*.o
+*.res
+keycont
+create-req
