@@ -39,7 +39,10 @@ create-req: create-req.c
 	$(MINGWCC) $@.c $(CFLAGS) -lcrypt32 -o $@
 	$(CC) $(CFLAGS) $@.c -I /opt/cprocsp/include/cpcsp -L/opt/cprocsp/lib/amd64 -lcapi10 -lcapi20 -lrdrsup -o $@
 
-https:
+wineutil: wineutil-impl.c wineutil.c wineutil.h
+	$(WINECC) $(CFLAGS) -shared -fPIC $@-impl.c $@.spec -lgnutls -o $@
+
+https: wineutil
 	$(MINGWCC) $(CFLAGS) $@.c wineutil.c -I/opt/cprocsp/include/cpcsp -I/home/ten0s/Avest_AvSDK/AvCSPSDK/examples/CAPI/CAPI1 -lcrypt32 -lcryptui -lws2_32 -o $@
 
 clean:
