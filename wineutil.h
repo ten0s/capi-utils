@@ -11,7 +11,6 @@ void WineUtilDeinit();
 BOOL GetWineVersion(DWORD *pdwMajor, DWORD *pdwMinor);
 
 BOOL IsWine();
-BOOL IsWineCSP();
 
 BOOL WineSetEnv(LPCSTR szName, LPCSTR szValue);
 BOOL WineUnsetEnv(LPCSTR szName);

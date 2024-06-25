@@ -103,21 +103,6 @@ BOOL IsWine()
     return FALSE;
 }
 
-BOOL IsWineCSP()
-{
-    const DWORD MIN_WINE_CSP_MAJOR = 9;
-    const DWORD MIN_WINE_CSP_MINOR = 0;
-
-    DWORD dwMajor = 0;
-    DWORD dwMinor = 0;
-    if (GetWineVersion(&dwMajor, &dwMinor)) {
-        return dwMajor >= MIN_WINE_CSP_MAJOR
-            && dwMinor >= MIN_WINE_CSP_MINOR;
-    }
-
-    return FALSE;
-}
-
 BOOL WineSetEnv(LPCSTR szName, LPCSTR szValue)
 {
     if (!pWineSetEnv)
