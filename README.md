@@ -1,5 +1,21 @@
 # Microsoft CAPI utilities
 
+## Pre-requisites
+
+* Install Wine https://wiki.winehq.org/Ubuntu
+
+* Install Wine dev
+
+```
+$ sudo apt install wine-stable wine-stable-dev
+```
+
+* Install MinGW
+
+```
+$ sudo apt install mingw-w64 mingw-w64-tools
+```
+
 ## Build
 
 ```
