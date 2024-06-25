@@ -6,8 +6,6 @@
 $ make
 ```
 
-```
-
 ## HTTPS client
 
 ```
