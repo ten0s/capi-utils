@@ -18,4 +18,7 @@ PrintError(LPCSTR szMsgFmt, DWORD dwError);
 void
 PrintBytes(const BYTE *pbByte, DWORD dwSize);
 
+DWORD
+ParseAlgId(LPCSTR szStr);
+
 #endif // __UTIL_H__

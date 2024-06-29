@@ -63,3 +63,17 @@ PrintBytes(const BYTE *pbByte, DWORD dwSize)
     }
     printf("\n");
 }
+
+DWORD
+ParseAlgId(LPCSTR szStr)
+{
+    DWORD dwAlgId = 0;
+
+    if (szStr[0] == '0' && tolower(szStr[1]) == 'x') {
+        sscanf(szStr, "%x", &dwAlgId);
+    } else {
+        sscanf(szStr, "%d", &dwAlgId);
+    }
+
+    return dwAlgId;
+}

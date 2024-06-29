@@ -13,9 +13,6 @@
 
 #include "util.h"
 
-static DWORD
-ParseAlgId(LPCSTR szStr);
-
 static void
 usage(const char *prog)
 {
@@ -139,18 +136,4 @@ main(int argc, char *argv[])
     }
 
     return EXIT_SUCCESS;
-}
-
-static DWORD
-ParseAlgId(LPCSTR szStr)
-{
-    DWORD dwAlgId = 0;
-
-    if (szStr[0] == '0' && tolower(szStr[1]) == 'x') {
-        sscanf(szStr, "%x", &dwAlgId);
-    } else {
-        sscanf(szStr, "%d", &dwAlgId);
-    }
-
-    return dwAlgId;
 }
