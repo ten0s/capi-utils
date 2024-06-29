@@ -17,7 +17,14 @@
 static void
 ListContainers(LPCSTR szProvName,
                DWORD szProvType,
-               BOOL bMachineKeySet);
+               BOOL bMachineKeySet,
+               INT iVerbose,
+               BOOL bNoUI);
+
+static void
+ListKeyParams(HCRYPTPROV hProv,
+              DWORD dwFlags,
+              INT iVerbose);
 
 static void
 CreateContainer(LPCSTR szProvName,
@@ -25,13 +32,15 @@ CreateContainer(LPCSTR szProvName,
                 LPCSTR szContName,
                 BOOL bMachineKeySet,
                 BOOL bSignatureKey,
-                BOOL bExchangeKey);
+                BOOL bExchangeKey,
+                BOOL bNoUI);
 
 static void
 DeleteContainer(LPCSTR szProvName,
                 DWORD dwProvType,
                 LPCSTR szContName,
-                BOOL bMachineKeySet);
+                BOOL bMachineKeySet,
+                BOOL bNoUI);
 
 static void
 usage(const char *prog)
@@ -43,9 +52,11 @@ usage(const char *prog)
             "   -D <cont name> Delete Container\n"
             "   -n <prov name> Provider Name, optional\n"
             "   -t <prov type> Provider Type, mandatory\n"
-            "   -m             Machine KeySet, by default: User KeySet\n"
-            "   -s             Create Signature Key, might be ignored by CSP\n"
-            "   -x             Create Exchange Key, might be ignored by CSP\n"
+            "   -m             Create CRYPT_MACHINE_KEYSET\n"
+            "   -s             Create AT_SIGNATURE Key, might be ignored by CSP\n"
+            "   -x             Create AT_KEYEXCHANGE Key, might be ignored by CSP\n"
+            "   -v[...]        Verbose Level, by default: 0\n"
+            "   -q             Quiet / Silent / No UI Mode\n"
             "   -h             Help\n",
             prog
     );
@@ -71,9 +82,11 @@ main(int argc, char *argv[])
     BOOL bMachineKeySet = FALSE;
     BOOL bSignatureKey = FALSE;
     BOOL bExchangekey = FALSE;
+    INT iVerbose = 0;
+    BOOL bNoUI = FALSE;
 
     int opt;
-    while ((opt = getopt(argc, argv, "LC:D:n:t:msxh")) != -1) {
+    while ((opt = getopt(argc, argv, "LC:D:n:t:msxvqh")) != -1) {
         switch (opt) {
         case 'L':
             bList = TRUE;
@@ -108,6 +121,14 @@ main(int argc, char *argv[])
             bExchangekey = TRUE;
             break;
 
+        case 'v':
+            iVerbose++;
+            break;
+
+        case 'q':
+            bNoUI = TRUE;
+            break;
+
         case 'h':
             usage(prog);
             exit(EXIT_SUCCESS);
@@ -125,16 +146,23 @@ main(int argc, char *argv[])
     }
 
     if (!dwProvType) {
+        fprintf(stderr, "Provider Type is not given\n");
+        usage(prog);
+        exit(EXIT_FAILURE);
+    }
+
+    if ((bCreate || bDelete) && !szContName) {
+        fprintf(stderr, "Container Name is not given\n");
         usage(prog);
         exit(EXIT_FAILURE);
     }
 
     if (bList) {
-        ListContainers(szProvName, dwProvType, bMachineKeySet);
+        ListContainers(szProvName, dwProvType, bMachineKeySet, iVerbose, bNoUI);
     } else if (bCreate) {
-        CreateContainer(szProvName, dwProvType, szContName, bMachineKeySet, bSignatureKey, bExchangekey);
+        CreateContainer(szProvName, dwProvType, szContName, bMachineKeySet, bSignatureKey, bExchangekey, bNoUI);
     } else if (bDelete) {
-        DeleteContainer(szProvName, dwProvType, szContName, bMachineKeySet);
+        DeleteContainer(szProvName, dwProvType, szContName, bMachineKeySet, bNoUI);
     }
 
     return EXIT_SUCCESS;
@@ -143,34 +171,133 @@ main(int argc, char *argv[])
 static void
 ListContainers(LPCSTR szProvName,
                DWORD dwProvType,
-               BOOL bMachineKeySet)
+               BOOL bMachineKeySet,
+               BOOL iVerbose,
+               BOOL bNoUI)
 {
-    HCRYPTPROV hProv = 0;
+    HCRYPTPROV hProv;
 
-    DWORD dwFlags = CRYPT_VERIFYCONTEXT;
-    dwFlags = bMachineKeySet ? dwFlags | CRYPT_MACHINE_KEYSET : dwFlags;
+    DWORD dwACFlags = CRYPT_VERIFYCONTEXT;
+    dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
+    dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
 
-    if (!CryptAcquireContext(&hProv, NULL, szProvName, dwProvType, dwFlags)) {
+    if (!CryptAcquireContext(&hProv, NULL, szProvName, dwProvType, dwACFlags)) {
         PrintError("CryptAcquireContext CRYPT_VERIFYCONTEXT", GetLastError());
         exit(1);
     }
 
-    DWORD flags = CRYPT_FIRST;
+    DWORD dwPPFlags = CRYPT_FIRST;
 
-    DWORD size;
-    if (!CryptGetProvParam(hProv, PP_ENUMCONTAINERS, 0, &size, flags)) {
+    DWORD dwSize;
+    if (!CryptGetProvParam(hProv, PP_ENUMCONTAINERS, 0, &dwSize, dwPPFlags)) {
         PrintError("CryptGetProvParam PP_ENUMCONTAINERS", GetLastError());
         exit(1);
     }
 
-    CHAR buf[size];
-    while (CryptGetProvParam(hProv, PP_ENUMCONTAINERS, buf, &size, flags)) {
-        printf("%s\n", buf);
-        flags = 0;
+    CHAR szContName[dwSize];
+    while (CryptGetProvParam(hProv, PP_ENUMCONTAINERS, szContName, &dwSize, dwPPFlags)) {
+        if (iVerbose) {
+            printf("Name: ");
+        }
+        printf("%s\n", szContName);
+
+        if (iVerbose) {
+            HCRYPTPROV hContProv;
+
+            dwACFlags = 0;
+            dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
+            dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
+
+            if (!CryptAcquireContext(&hContProv, szContName, szProvName, dwProvType, dwACFlags)) {
+                PrintError("CryptAcquireContext szContName", GetLastError());
+            }
+
+            ListKeyParams(hContProv, AT_SIGNATURE, iVerbose);
+            ListKeyParams(hContProv, AT_KEYEXCHANGE, iVerbose);
+
+            CryptReleaseContext(hContProv, 0);
+        }
+
+        dwPPFlags = CRYPT_NEXT;
     }
 
     CryptReleaseContext(hProv, 0);
 }
+
+static void
+ListKeyParams(HCRYPTPROV hProv,
+              DWORD dwFlags,
+              INT iVerbose)
+{
+    HCRYPTKEY hKey;
+    if (CryptGetUserKey(hProv, dwFlags, &hKey)) {
+        printf(" Type: ");
+        switch (dwFlags) {
+        case AT_SIGNATURE:
+            printf("AT_SIGNATURE");
+            break;
+        case AT_KEYEXCHANGE:
+            printf("AT_KEYEXCHANGE");
+            break;
+        default:
+            printf("Unknown (%d)", dwFlags);
+        }
+        printf("\n");
+        ALG_ID aiAlgid;
+        DWORD dwSize = sizeof(aiAlgid);
+        if (CryptGetKeyParam(hKey, KP_ALGID, (BYTE *)&aiAlgid, &dwSize, 0)) {
+            printf("   KP_ALGID: 0x%08x\n", aiAlgid);
+        } else if (iVerbose > 1) {
+            PrintError("CryptGetKeyParam KP_ALGID", GetLastError());
+        }
+        DWORD dwKeyLen;
+        dwSize = sizeof(dwKeyLen);
+        if (CryptGetKeyParam(hKey, KP_KEYLEN, (BYTE *)&dwKeyLen, &dwSize, 0)) {
+            printf("   KP_KEYLEN: %d\n", dwKeyLen);
+        } else if (iVerbose > 1) {
+            PrintError("CryptGetKeyParam KP_KEYLEN", GetLastError());
+        }
+        DWORD dwPerms;
+        dwSize = sizeof(dwPerms);
+        if (CryptGetKeyParam(hKey, KP_PERMISSIONS, (BYTE *)&dwPerms, &dwSize, 0)) {
+            printf("   KP_PERMISSIONS: (%d) ", dwPerms);
+            struct { DWORD key; const char *name; } perms[] = {
+                {CRYPT_ARCHIVE   , "CRYPT_ARCHIVE"},
+                {CRYPT_DECRYPT   , "CRYPT_DECRYPT"},
+                {CRYPT_ENCRYPT   , "CRYPT_ENCRYPT"},
+                {CRYPT_EXPORT    , "CRYPT_EXPORT"},
+                {CRYPT_EXPORT_KEY, "CRYPT_EXPORT_KEY"},
+                {CRYPT_IMPORT_KEY, "CRYPT_IMPORT_KEY"},
+                {CRYPT_MAC       , "CRYPT_MAC"},
+                {CRYPT_READ      , "CRYPT_READ"},
+                {CRYPT_WRITE     , "CRYPT_WRITE"},
+            };
+            for (int i = 0; i < sizeof(perms)/sizeof(perms[0]); i++) {
+                if (dwPerms & perms[i].key) {
+                    printf("%s ", perms[i].name);
+                }
+            }
+            printf("\n");
+        } else if (iVerbose > 1) {
+            PrintError("CryptGetKeyParam KP_PERMISSIONS", GetLastError());
+        }
+        dwSize = 0;
+        if (CryptGetKeyParam(hKey, KP_SALT, NULL, &dwSize, 0)) {
+            BYTE bSalt[dwSize];
+            if (CryptGetKeyParam(hKey, KP_SALT, bSalt, &dwSize, 0)) {
+                printf("   KP_SALT: ");
+                PrintBytes(bSalt, dwSize);
+            }
+        } else if (iVerbose > 1) {
+            PrintError("CryptGetKeyParam KP_SALT", GetLastError());
+        }
+
+        CryptDestroyKey(hKey);
+    } else {
+        PrintError("CryptGetUserKey", GetLastError());
+    }
+}
+
 
 static void
 CreateContainer(LPCSTR szProvName,
@@ -178,12 +305,14 @@ CreateContainer(LPCSTR szProvName,
                 LPCSTR szContName,
                 BOOL bMachineKeySet,
                 BOOL bSignatureKey,
-                BOOL bExchangeKey)
+                BOOL bExchangeKey,
+                BOOL bNoUI)
 {
     HCRYPTPROV hProv;
 
     DWORD dwFlags = CRYPT_NEWKEYSET;
     dwFlags = bMachineKeySet ? dwFlags | CRYPT_MACHINE_KEYSET : dwFlags;
+    dwFlags = bNoUI ? dwFlags | CRYPT_SILENT : dwFlags;
 
     if (!CryptAcquireContext(&hProv, szContName, szProvName, dwProvType, dwFlags)) {
         PrintError("CryptAcquireContext CRYPT_NEWKEYSET", GetLastError());
@@ -215,12 +344,14 @@ static void
 DeleteContainer(LPCSTR szProvName,
                 DWORD dwProvType,
                 LPCSTR szContName,
-                BOOL bMachineKeySet)
+                BOOL bMachineKeySet,
+                BOOL bNoUI)
 {
     HCRYPTPROV hProv;
 
     DWORD dwFlags = CRYPT_DELETEKEYSET;
     dwFlags = bMachineKeySet ? dwFlags | CRYPT_MACHINE_KEYSET : dwFlags;
+    dwFlags = bNoUI ? dwFlags | CRYPT_SILENT : dwFlags;
 
     if (!CryptAcquireContext(&hProv, szContName, szProvName, dwProvType, dwFlags)) {
         PrintError("CryptAcquireContext CRYPT_DELETEKEYSET", GetLastError());
