@@ -293,11 +293,19 @@ ListKeyParams(HCRYPTPROV hProv,
         }
 
         CryptDestroyKey(hKey);
-    } else {
-        PrintError("CryptGetUserKey", GetLastError());
+    } else if (iVerbose > 1) {
+        switch (dwFlags) {
+        case AT_SIGNATURE:
+            PrintError("CryptGetUserKey AT_SIGNATURE", GetLastError());
+            break;
+        case AT_KEYEXCHANGE:
+            PrintError("CryptGetUserKey AT_KEYEXCHANGE", GetLastError());
+            break;
+        default:
+            PrintError("CryptGetUserKey dwFlags", GetLastError());
+        }
     }
 }
-
 
 static void
 CreateContainer(LPCSTR szProvName,
@@ -315,8 +323,20 @@ CreateContainer(LPCSTR szProvName,
     dwFlags = bNoUI ? dwFlags | CRYPT_SILENT : dwFlags;
 
     if (!CryptAcquireContext(&hProv, szContName, szProvName, dwProvType, dwFlags)) {
-        PrintError("CryptAcquireContext CRYPT_NEWKEYSET", GetLastError());
-        exit(1);
+        DWORD dwError = GetLastError();
+        if (dwError = NTE_EXISTS) {
+            dwFlags = 0;
+            dwFlags = bMachineKeySet ? dwFlags | CRYPT_MACHINE_KEYSET : dwFlags;
+            dwFlags = bNoUI ? dwFlags | CRYPT_SILENT : dwFlags;
+
+            if (!CryptAcquireContext(&hProv, szContName, szProvName, dwProvType, dwFlags)) {
+                PrintError("CryptAcquireContext 0", GetLastError());
+                exit(1);
+            }
+        } else {
+            PrintError("CryptAcquireContext CRYPT_NEWKEYSET", GetLastError());
+            exit(1);
+        }
     }
 
     if (bSignatureKey) {
