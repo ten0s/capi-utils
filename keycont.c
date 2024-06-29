@@ -53,8 +53,8 @@ usage(const char *prog)
             "   -n <prov name> Provider Name, optional\n"
             "   -t <prov type> Provider Type, mandatory\n"
             "   -m             Create CRYPT_MACHINE_KEYSET\n"
-            "   -s             Create AT_SIGNATURE Key, might be ignored by CSP\n"
-            "   -x             Create AT_KEYEXCHANGE Key, might be ignored by CSP\n"
+            "   -s             Create AT_SIGNATURE Key Pair, might be ignored by CSP\n"
+            "   -x             Create AT_KEYEXCHANGE Key Pair, might be ignored by CSP\n"
             "   -v[...]        Verbose Level, by default: 0\n"
             "   -q             Quiet / Silent / No UI Mode\n"
             "   -h             Help\n",
