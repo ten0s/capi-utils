@@ -21,4 +21,7 @@ PrintBytes(const BYTE *pbByte, DWORD dwSize);
 DWORD
 ParseAlgId(LPCSTR szStr);
 
+LPCSTR
+KeyType(DWORD dwKeyType);
+
 #endif // __UTIL_H__

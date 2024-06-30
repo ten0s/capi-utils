@@ -23,7 +23,7 @@ ListContainers(LPCSTR szProvName,
 
 static void
 ListKeyParams(HCRYPTPROV hProv,
-              DWORD dwFlags,
+              DWORD dwKeyType,
               INT iVerbose);
 
 static void
@@ -43,6 +43,23 @@ DeleteContainer(LPCSTR szProvName,
                 BOOL bNoUI);
 
 static void
+ExportKey(LPCSTR szProvName,
+          DWORD dwProvType,
+          LPCSTR szContName,
+          BOOL bMachineKeySet,
+          BOOL bSignatureKey,
+          BOOL bExchangeKey,
+          BOOL bNoUI);
+
+static void
+PrintKey(HCRYPTPROV hProv,
+         DWORD dwKeyType);
+
+// NB:
+// Create AT_SIGNATURE and AT_KEYEXCHANGE key pairs might be ignored by
+// some CSP since it creates the key pairs automatically.
+
+static void
 usage(const char *prog)
 {
     fprintf(stderr,
@@ -50,11 +67,12 @@ usage(const char *prog)
             "   -L             List Containers\n"
             "   -C <cont name> Create Container\n"
             "   -D <cont name> Delete Container\n"
+            "   -E <cont name> Export Key Pair\n"
             "   -n <prov name> Provider Name, optional\n"
             "   -t <prov type> Provider Type, mandatory\n"
             "   -m             Create CRYPT_MACHINE_KEYSET\n"
-            "   -s             Create AT_SIGNATURE Key Pair, might be ignored by CSP\n"
-            "   -x             Create AT_KEYEXCHANGE Key Pair, might be ignored by CSP\n"
+            "   -s             Create/Export AT_SIGNATURE Key Pair\n"
+            "   -x             Create/Export AT_KEYEXCHANGE Key Pair\n"
             "   -v[...]        Verbose Level, by default: 0\n"
             "   -q             Quiet / Silent / No UI Mode\n"
             "   -h             Help\n",
@@ -76,6 +94,7 @@ main(int argc, char *argv[])
     BOOL bList = FALSE;
     BOOL bCreate = FALSE;
     BOOL bDelete = FALSE;
+    BOOL bExport = FALSE;
     LPSTR szContName = NULL;
     LPSTR szProvName = NULL;
     DWORD dwProvType = 0;
@@ -86,7 +105,7 @@ main(int argc, char *argv[])
     BOOL bNoUI = FALSE;
 
     int opt;
-    while ((opt = getopt(argc, argv, "LC:D:n:t:msxvqh")) != -1) {
+    while ((opt = getopt(argc, argv, "LC:D:E:n:t:msxvqh")) != -1) {
         switch (opt) {
         case 'L':
             bList = TRUE;
@@ -99,6 +118,11 @@ main(int argc, char *argv[])
 
         case 'D':
             bDelete = TRUE;
+            szContName = optarg;
+            break;
+
+        case 'E':
+            bExport = TRUE;
             szContName = optarg;
             break;
 
@@ -140,7 +164,7 @@ main(int argc, char *argv[])
         }
     }
 
-    if (!bList && !bCreate && !bDelete) {
+    if (!bList && !bCreate && !bDelete && !bExport) {
         usage(prog);
         exit(EXIT_FAILURE);
     }
@@ -151,7 +175,7 @@ main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if ((bCreate || bDelete) && !szContName) {
+    if ((bCreate || bDelete || bExport) && !szContName) {
         fprintf(stderr, "Container Name is not given\n");
         usage(prog);
         exit(EXIT_FAILURE);
@@ -163,6 +187,8 @@ main(int argc, char *argv[])
         CreateContainer(szProvName, dwProvType, szContName, bMachineKeySet, bSignatureKey, bExchangekey, bNoUI);
     } else if (bDelete) {
         DeleteContainer(szProvName, dwProvType, szContName, bMachineKeySet, bNoUI);
+    } else if (bExport) {
+        ExportKey(szProvName, dwProvType, szContName, bMachineKeySet, bSignatureKey, bExchangekey, bNoUI);
     }
 
     return EXIT_SUCCESS;
@@ -196,6 +222,9 @@ ListContainers(LPCSTR szProvName,
 
     CHAR szContName[dwSize];
     while (CryptGetProvParam(hProv, PP_ENUMCONTAINERS, szContName, &dwSize, dwPPFlags)) {
+
+        dwPPFlags = CRYPT_NEXT;
+
         if (iVerbose) {
             printf("Name: ");
         }
@@ -217,8 +246,6 @@ ListContainers(LPCSTR szProvName,
 
             CryptReleaseContext(hContProv, 0);
         }
-
-        dwPPFlags = CRYPT_NEXT;
     }
 
     CryptReleaseContext(hProv, 0);
@@ -226,23 +253,12 @@ ListContainers(LPCSTR szProvName,
 
 static void
 ListKeyParams(HCRYPTPROV hProv,
-              DWORD dwFlags,
+              DWORD dwKeyType,
               INT iVerbose)
 {
     HCRYPTKEY hKey;
-    if (CryptGetUserKey(hProv, dwFlags, &hKey)) {
-        printf(" Type: ");
-        switch (dwFlags) {
-        case AT_SIGNATURE:
-            printf("AT_SIGNATURE");
-            break;
-        case AT_KEYEXCHANGE:
-            printf("AT_KEYEXCHANGE");
-            break;
-        default:
-            printf("Unknown (%d)", dwFlags);
-        }
-        printf("\n");
+    if (CryptGetUserKey(hProv, dwKeyType, &hKey)) {
+        printf(" Type: %s\n", KeyType(dwKeyType));
         ALG_ID aiAlgid;
         DWORD dwSize = sizeof(aiAlgid);
         if (CryptGetKeyParam(hKey, KP_ALGID, (BYTE *)&aiAlgid, &dwSize, 0)) {
@@ -294,7 +310,7 @@ ListKeyParams(HCRYPTPROV hProv,
 
         CryptDestroyKey(hKey);
     } else if (iVerbose > 1) {
-        switch (dwFlags) {
+        switch (dwKeyType) {
         case AT_SIGNATURE:
             PrintError("CryptGetUserKey AT_SIGNATURE", GetLastError());
             break;
@@ -302,7 +318,7 @@ ListKeyParams(HCRYPTPROV hProv,
             PrintError("CryptGetUserKey AT_KEYEXCHANGE", GetLastError());
             break;
         default:
-            PrintError("CryptGetUserKey dwFlags", GetLastError());
+            PrintError("CryptGetUserKey dwKeyType", GetLastError());
         }
     }
 }
@@ -379,4 +395,71 @@ DeleteContainer(LPCSTR szProvName,
     }
 
     CryptReleaseContext(hProv, 0);
+}
+
+static void
+ExportKey(LPCSTR szProvName,
+          DWORD dwProvType,
+          LPCSTR szContName,
+          BOOL bMachineKeySet,
+          BOOL bSignatureKey,
+          BOOL bExchangeKey,
+          BOOL bNoUI)
+{
+    HCRYPTPROV hProv;
+
+    DWORD dwACFlags = 0;
+    dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
+    dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
+
+    if (!CryptAcquireContext(&hProv, szContName, szProvName, dwProvType, dwACFlags)) {
+        PrintError("CryptAcquireContext 0", GetLastError());
+        exit(1);
+    }
+
+    if (bSignatureKey) {
+        PrintKey(hProv, AT_SIGNATURE);
+    }
+
+    if (bExchangeKey) {
+        PrintKey(hProv, AT_KEYEXCHANGE);
+    }
+
+    CryptReleaseContext(hProv, 0);
+}
+
+static void
+PrintKey(HCRYPTPROV hProv,
+         DWORD dwKeyType)
+{
+    HCRYPTKEY hKey;
+    if (!CryptGetUserKey(hProv, dwKeyType, &hKey)) {
+        DWORD dwError = GetLastError();
+        if (dwError == NTE_NO_KEY) {
+            fprintf(stderr, "%s Key Pair not found\n", KeyType(dwKeyType));
+            exit(1);
+        } else {
+            PrintError("CryptGetUserKey", dwError);
+            exit(1);
+        }
+    }
+
+    DWORD cbKeyBlob = 0;
+
+    if (!CryptExportKey(hKey, 0, PUBLICKEYBLOB, 0, NULL, &cbKeyBlob)) {
+        PrintError("CryptExportKey", GetLastError());
+        exit(1);
+    }
+
+    BYTE bKeyBlob[cbKeyBlob];
+
+    if (!CryptExportKey(hKey, 0, PUBLICKEYBLOB, 0, bKeyBlob, &cbKeyBlob)) {
+        PrintError("CryptExportKey", GetLastError());
+        exit(1);
+    }
+
+    printf("PUBLICKEYBLOB %s:\n", KeyType(dwKeyType));
+    PrintBytes(bKeyBlob, cbKeyBlob);
+
+    CryptDestroyKey(hKey);
 }

@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include "util.h"
 
@@ -76,4 +77,23 @@ ParseAlgId(LPCSTR szStr)
     }
 
     return dwAlgId;
+}
+
+LPCSTR
+KeyType(DWORD dwKeyType)
+{
+    static CHAR szKeyType[256];
+
+    switch (dwKeyType) {
+    case AT_SIGNATURE:
+        snprintf(szKeyType, sizeof(szKeyType), "AT_SIGNATURE");
+        break;
+    case AT_KEYEXCHANGE:
+        snprintf(szKeyType, sizeof(szKeyType), "AT_KEYEXCHANGE");
+        break;
+    default:
+        snprintf(szKeyType, sizeof(szKeyType), "Key Type (%d)", dwKeyType);
+    }
+
+    return szKeyType;
 }
