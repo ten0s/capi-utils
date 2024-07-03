@@ -203,6 +203,8 @@ ListContainers(LPCSTR szProvName,
 {
     HCRYPTPROV hProv;
 
+    // CRYPT_VERIFYCONTEXT is used for ephemeral keys only,
+    // i.e. no access to persisted private keys
     DWORD dwACFlags = CRYPT_VERIFYCONTEXT;
     dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
     dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
@@ -233,6 +235,8 @@ ListContainers(LPCSTR szProvName,
         if (iVerbose) {
             HCRYPTPROV hContProv;
 
+            // Since access to private keys is needed,
+            // don't specify CRYPT_VERIFYCONTEXT
             dwACFlags = 0;
             dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
             dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
@@ -408,6 +412,8 @@ ExportKey(LPCSTR szProvName,
 {
     HCRYPTPROV hProv;
 
+    // Since access to private keys is needed,
+    // don't specify CRYPT_VERIFYCONTEXT
     DWORD dwACFlags = 0;
     dwACFlags = bMachineKeySet ? dwACFlags | CRYPT_MACHINE_KEYSET : dwACFlags;
     dwACFlags = bNoUI ? dwACFlags | CRYPT_SILENT : dwACFlags;
