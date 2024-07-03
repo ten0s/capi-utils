@@ -71,10 +71,10 @@ usage(const char *prog)
             "   -n <prov name> Provider Name, optional\n"
             "   -t <prov type> Provider Type, mandatory\n"
             "   -m             Create CRYPT_MACHINE_KEYSET\n"
-            "   -s             Create/Export AT_SIGNATURE Key Pair\n"
-            "   -x             Create/Export AT_KEYEXCHANGE Key Pair\n"
+            "   -s             Create / Export AT_SIGNATURE Key Pair\n"
+            "   -x             Create / Export AT_KEYEXCHANGE Key Pair\n"
             "   -v[...]        Verbose Level, by default: 0\n"
-            "   -q             Quiet / Silent / No UI Mode\n"
+            "   -q             Quiet / No UI Mode\n"
             "   -h             Help\n",
             prog
     );
